@@ -1,13 +1,18 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 require('./database'); // Connect to MongoDB
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const loginRoute = require('./routes/login'); // Make sure to create this route file
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(bodyParser.json());
 
-// Define routes here. For example:
+// Use the login route
+app.use(loginRoute);
+
 app.get('/', (req, res) => res.send('MediSwift API Running'));
 
 // Start the server
