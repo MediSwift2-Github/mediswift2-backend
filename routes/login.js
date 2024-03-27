@@ -1,7 +1,7 @@
 // routes/login.js
 const express = require('express');
 const router = express.Router();
-const User = require('../users/users'); // Make sure this path is correct
+const User = require('../database/users'); // Make sure this path is correct
 
 
 router.post('/api/login', async (req, res) => {
