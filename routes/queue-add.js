@@ -7,6 +7,11 @@ router.post('/api/queue/add', async (req, res) => {
     try {
         const { patientId } = req.body;
 
+        const existingEntry = await Queue.findOne({ patientId });
+
+        if (existingEntry) {
+            return res.status(400).send('Patient is already in the queue.');
+        }
         // Create a new queue entry
         const queueEntry = new Queue({
             patientId
@@ -25,9 +30,11 @@ router.post('/api/queue/add', async (req, res) => {
 router.get('/api/queue', async (req, res) => {
     try {
         const queueEntries = await Queue.find({})
-            .populate('patientId', 'name')
+            .populate('patientId', 'name mobile_number') // Include mobile_number in the populated fields
             .sort({ queueEntryTime: 1 }) // Sort by entry time
             .exec();
+        console.log(queueEntries);
+
 
         res.status(200).send(queueEntries);
     } catch (error) {

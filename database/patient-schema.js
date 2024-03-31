@@ -3,7 +3,7 @@ const Schema = mongoose.Schema;
 
 const patientSchema = new Schema({
     name: { type: String, required: true },
-    mobile_number: { type: String, required: true, unique: true }, // Assuming mobile_number should be unique
+    mobile_number: { type: String, required: true }, // Assuming mobile_number should be unique
     medical_history: [{
         date: { type: Date },
         notes: String,

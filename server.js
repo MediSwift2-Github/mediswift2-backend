@@ -6,10 +6,15 @@ const loginRoute = require('./routes/login'); // Make sure to create this route 
 const patientRoutes = require('./routes/add-patient');
 const searchPatient = require('./routes/search-patient');
 const queue = require('./routes/queue-add');
+const setupRealtimeUpdates = require('./realtimeUpdates');
+const http = require('http');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const server = http.createServer(app);
 
+
+setupRealtimeUpdates(server);
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -22,7 +27,7 @@ app.use(queue);
 app.get('/', (req, res) => res.send('MediSwift API Running'));
 
 // Start the server
-app.listen(port, () => {
+server.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
 

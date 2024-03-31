@@ -13,8 +13,8 @@ const queueSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['start', 'on-going', 'completed'],
-        default: 'start'
+        enum: ['Chatting', 'Completed', 'End Chat'],
+        default: 'Chatting'
     }
 });
 
