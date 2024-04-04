@@ -49,6 +49,59 @@ async function chatWithGPT(prompt, conversationHistory, medicalHistory) {
         return { success: false, error: error.message, conversationHistory };
     }
 }
+async function summarizeConversation(conversationHistory) {
+    // Filter out system messages before summarization
+    const filteredHistory = conversationHistory.filter(message => message.role !== "system");
+    console.log(filteredHistory);
+    // Construct a prompt that asks GPT to summarize the conversation
+    const summaryPrompt = {
+        role: "system",
+        content: "You are part of a virtual medical assistant designed to aid doctor. A chatbot was deployed that talked to the patient to gather detailed information about their concerns, symptoms , medical history etc to help doctor know the purpose of the visit while also providing all the details retrieved during the chat. Your job is to understand the conversation and make a detailed clinical notes that includes all the medical details, while taking care of not adding any noise or unwanted details. The report will be further processed by gpt-3.5, so write it in a way that is convinent for it. This is the conversation:",
+    };
 
-module.exports = chatWithGPT;
+    // Add the summary prompt at the beginning of the conversation history
+    filteredHistory.unshift(summaryPrompt);
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: filteredHistory, // Use the filtered and updated history here
+        });
+
+        const summaryMessage = response.choices[0].message.content;
+        console.log(summaryMessage);
+        // Call convertSummaryToJSON right after the summary is generated
+        await convertSummaryToJSON(summaryMessage);
+        return { success: true, content: summaryMessage };
+    } catch (error) {
+        console.error('Error generating summary with OpenAI:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+async function convertSummaryToJSON(summary) {
+    const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo-0125",
+        messages: [
+            {
+                role: "system",
+                content: "You are a helpful assistant designed to output JSON. Given a medical summary, output a structured JSON object with fields for purpose of visit, chronicDiseases, acuteSymptoms, allergies, medications, previousTreatments, patientConcerns, infectiousDiseaseExposure, nutritionalStatus, familyMedicalHistory, and lifestyleFactors. If information for a field is not available in the summary, set that field to null."
+            },
+            {
+                role: "user",
+                content: summary
+            }
+        ],
+        response_format: { type: "json_object" },
+    });
+    console.log(completion.choices[0].message.content);
+    return completion.choices[0].message.content;
+}
+
+
+module.exports = {
+    chatWithGPT,
+    summarizeConversation
+};
+
 

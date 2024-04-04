@@ -1,5 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
-const chatWithGPT = require('./gptChat');
+const { chatWithGPT, summarizeConversation } = require('./gptChat');
 const Queue = require('../database/queue-schema');
 const Patient = require('../database/patient-schema');
 const token = '6966801360:AAF7d2ec-Fq5yWKO9bgwn9N-CtgdbvhIAsk';
@@ -28,16 +28,36 @@ const isMobileNumberInQueue = async (mobileNumber) => {
 };
 
 
-// Function to handle end of session actions
-function endSessionActions(chatId) {
+    // Function to handle end of session actions
+async function endSessionActions(chatId) {
     console.log(`Session for ${chatId} has ended.`);
+    // Log the complete conversation before ending the session
+    console.log(`Complete conversation for chat ID ${chatId}:`, JSON.stringify(conversations[chatId], null, 2));
+    // Retrieve the conversation history for summarization
+    let conversationHistory = conversations[chatId].messages.map(message => ({
+        role: message.sender === 'user' ? 'user' : 'assistant',
+        content: message.content
+    }));
+
+    // Generate the summary
+    const { success, content } = await summarizeConversation(conversationHistory);
+
+    if (success) {
+        // Send the conversation summary to the user
+        await bot.sendMessage(chatId, `Here's a summary of our conversation: ${content}`);
+    } else {
+        // Handle errors or inability to generate a summary
+        await bot.sendMessage(chatId, `I couldn't generate a summary due to an error.`);
+    }
+
     // Notify the user that their session has ended
-    bot.sendMessage(chatId, "Your session has ended. Thank you for chatting with us!");
+    await bot.sendMessage(chatId, "Your session has ended. Thank you for chatting with us!");
 
     // Clean up session data
-    delete conversations[chatId];
+    // delete conversations[chatId];
     delete sessionStartTimes[chatId];
 }
+
 
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
