@@ -6,6 +6,14 @@ const queueSchema = new mongoose.Schema({
         ref: 'Patient',
         required: true
     },
+    patientName: { // Adding patientName
+        type: String,
+        required: true
+    },
+    patientMobileNumber: { // Adding patientMobileNumber
+        type: String,
+        required: true
+    },
     queueEntryTime: {
         type: Date,
         default: Date.now,

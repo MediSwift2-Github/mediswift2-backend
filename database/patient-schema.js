@@ -3,13 +3,10 @@ const Schema = mongoose.Schema;
 
 const patientSchema = new Schema({
     name: { type: String, required: true },
-    mobile_number: { type: String, required: true }, // Assuming mobile_number should be unique
+    mobile_number: { type: String, required: true },
     medical_history: [{
-        date: { type: Date },
-        notes: String,
-        diagnosis: [String],
-        treatment_plan: String,
-        education_pamphlet_content: String,
+        visitDate: { type: Date, default: Date.now },
+        notes: mongoose.Schema.Types.Mixed
     }]
 }, { timestamps: true }); // Optionally add timestamps to automatically get createdAt and updatedAt fields
 

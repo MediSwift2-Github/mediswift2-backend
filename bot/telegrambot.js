@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const chatWithGPT = require('./gptChat');
 const Queue = require('../database/queue-schema');
-
+const Patient = require('../database/patient-schema');
 const token = '6966801360:AAF7d2ec-Fq5yWKO9bgwn9N-CtgdbvhIAsk';
 const bot = new TelegramBot(token, {polling: true});
 
@@ -11,20 +11,16 @@ const bot = new TelegramBot(token, {polling: true});
 let conversations = {};
 let sessionStartTimes = {};
 
-const SESSION_DURATION = 1 * 60 * 1000; // 10 minutes in milliseconds
+const SESSION_DURATION = 5 * 60 * 1000; // 10 minutes in milliseconds
+
+
 
 const isMobileNumberInQueue = async (mobileNumber) => {
     try {
-        const queueEntries = await Queue.find({})
-            .populate('patientId', 'mobile_number _id')
-            .exec();
-
-        for (let entry of queueEntries) {
-            if (entry.patientId && entry.patientId.mobile_number === mobileNumber) {
-                return true; // Found a match
-            }
-        }
-        return false; // No match found
+        console.log("Checking if mobile number is in queue:", mobileNumber);
+        const queueEntry = await Queue.findOne({ patientMobileNumber: mobileNumber }).exec();
+        console.log("Queue entry found:", queueEntry);
+        return !!queueEntry; // Returns true if an entry is found, otherwise false
     } catch (error) {
         console.error("Error checking mobile number in queue:", error);
         return false;
@@ -32,54 +28,54 @@ const isMobileNumberInQueue = async (mobileNumber) => {
 };
 
 
+// Function to handle end of session actions
+function endSessionActions(chatId) {
+    console.log(`Session for ${chatId} has ended.`);
+    // Notify the user that their session has ended
+    bot.sendMessage(chatId, "Your session has ended. Thank you for chatting with us!");
+
+    // Clean up session data
+    delete conversations[chatId];
+    delete sessionStartTimes[chatId];
+}
 
 bot.on('message', async (msg) => {
-    const chatId = msg.chat.id; // Unique identifier for each conversation/user
+    const chatId = msg.chat.id;
     const userMessage = msg.text;
-    const isInQueue = await isMobileNumberInQueue(chatId.toString());
 
-    if (userMessage === '/start') {
-        await bot.sendMessage(chatId, `Welcome! Your chat ID is ${chatId}. Please submit this ID on the website to get access to the bot.`);
+    if (userMessage === '/chat') {
+        await bot.sendMessage(chatId, `Your chat ID is: ${chatId}`);
+        return; // Stop further processing in this callback
     }
 
-    if (!isInQueue) {
-        await bot.sendMessage(chatId, "You are not currently in the queue or your session has expired.");
-        return; // Prevent further processing if the user isn't in the queue
-    }
-
-
-    // Check for session restart command
-    if (userMessage === '/restart') {
-        sessionStartTimes[chatId] = Date.now(); // Resets or starts the session timer
-        conversations[chatId] = []; // Optionally reset the conversation history
-        await bot.sendMessage(chatId, `Your session has been restarted. You have 10 more minutes.`);
-        return;
-    }
-
-    // Proceed with session and conversation handling
-    if (!sessionStartTimes[chatId]) {
-        // First message from the user in a session
-        sessionStartTimes[chatId] = Date.now();
-    } else if (sessionStartTimes[chatId] === 'expired') {
-        // Session expired and not restarted
-        await bot.sendMessage(chatId, "Your session has expired. Please send /restart to begin a new session.");
-        return;
-    } else if (Date.now() - sessionStartTimes[chatId] > SESSION_DURATION) {
-        // Session expired
-        sessionStartTimes[chatId] = 'expired';
-        await bot.sendMessage(chatId, "Your session has expired. Please send /restart to begin a new session.");
-        return;
-    }
-
-    // Proceed with normal message processing
     if (!conversations[chatId]) {
-        conversations[chatId] = [];
+        // Initialize conversation and session start time only if this is a new conversation
+        conversations[chatId] = { medicalHistory: [], messages: [] };
+        sessionStartTimes[chatId] = new Date();
+
+        // Check if the mobile number is in queue and handle accordingly
+        const isInQueue = await isMobileNumberInQueue(chatId.toString());
+        if (!isInQueue) {
+            await bot.sendMessage(chatId, "You are not currently in the queue or your session has expired.");
+            endSessionActions(chatId); // End the session immediately if not in queue
+            return;
+        }
+
+        // Start session timeout
+        setTimeout(() => {
+            endSessionActions(chatId);
+        }, SESSION_DURATION);
+
+        // Proceed to check queue and patient information as before...
     }
 
-    let conversationHistory = conversations[chatId];
-    const { success, content, conversationHistory: updatedHistory } = await chatWithGPT(userMessage, conversationHistory);
+    // Existing logic for handling messages, querying GPT, and updating conversation history
+    let conversationHistory = conversations[chatId].messages;
+    let medicalHistory = conversations[chatId].medicalHistory || [];
 
-    conversations[chatId] = updatedHistory;
+    const { success, content, conversationHistory: updatedHistory } = await chatWithGPT(userMessage, conversationHistory, medicalHistory);
+
+    conversations[chatId].messages = updatedHistory;
 
     if (success) {
         await bot.sendMessage(chatId, content);
@@ -88,7 +84,6 @@ bot.on('message', async (msg) => {
     }
 });
 
-// Stores each user's conversation history
 
 
 module.exports = bot;
