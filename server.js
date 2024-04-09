@@ -8,6 +8,8 @@ const searchPatient = require('./routes/search-patient');
 const queue = require('./routes/queue-add');
 const setupRealtimeUpdates = require('./realtimeUpdates');
 const http = require('http');
+const audioTranscription = require('./routes/audioTranscription');
+
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -24,6 +26,7 @@ app.use(loginRoute);
 app.use(patientRoutes);
 app.use(searchPatient);
 app.use(queue);
+app.use(audioTranscription);
 app.get('/', (req, res) => res.send('MediSwift API Running'));
 
 // Start the server

@@ -1,7 +1,8 @@
 const TelegramBot = require('node-telegram-bot-api');
-const { chatWithGPT, summarizeConversation } = require('./gptChat');
+const { chatWithGPT, summarizeConversation, convertSummaryToJSON } = require('./gptChat');
 const Queue = require('../database/queue-schema');
 const Patient = require('../database/patient-schema');
+const {storeSessionSummary} = require("../routes/storeSessionJSON");
 const token = '6966801360:AAF7d2ec-Fq5yWKO9bgwn9N-CtgdbvhIAsk';
 const bot = new TelegramBot(token, {polling: true});
 
@@ -33,6 +34,7 @@ async function endSessionActions(chatId) {
     console.log(`Session for ${chatId} has ended.`);
     // Log the complete conversation before ending the session
     console.log(`Complete conversation for chat ID ${chatId}:`, JSON.stringify(conversations[chatId], null, 2));
+
     // Retrieve the conversation history for summarization
     let conversationHistory = conversations[chatId].messages.map(message => ({
         role: message.sender === 'user' ? 'user' : 'assistant',
@@ -45,18 +47,30 @@ async function endSessionActions(chatId) {
     if (success) {
         // Send the conversation summary to the user
         await bot.sendMessage(chatId, `Here's a summary of our conversation: ${content}`);
+
+        // Find the queue entry to retrieve patientId
+        const queueEntry = await Queue.findOne({ patientMobileNumber: chatId.toString() }).exec();
+        if (queueEntry && queueEntry.patientId) {
+            // Convert the summary to JSON and store it
+            const summaryJSON = await convertSummaryToJSON(content);
+            // Now store the summary JSON in the patient's record using the patientId from the queue
+            await storeSessionSummary(queueEntry.patientId, summaryJSON);
+            console.log("Session summary successfully stored in patient's record.");
+        } else {
+            console.error("No queue entry found for chat ID:", chatId);
+        }
     } else {
         // Handle errors or inability to generate a summary
-        await bot.sendMessage(chatId, `I couldn't generate a summary due to an error.`);
+        await bot.sendMessage(chatId, "I couldn't generate a summary due to an error.");
     }
 
     // Notify the user that their session has ended
     await bot.sendMessage(chatId, "Your session has ended. Thank you for chatting with us!");
-
     // Clean up session data
-    // delete conversations[chatId];
     delete sessionStartTimes[chatId];
 }
+
+
 
 
 bot.on('message', async (msg) => {

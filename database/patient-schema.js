@@ -7,6 +7,11 @@ const patientSchema = new Schema({
     medical_history: [{
         visitDate: { type: Date, default: Date.now },
         notes: mongoose.Schema.Types.Mixed
+    }],
+    sessionSummaries: [{ // New field to store chat session summaries
+        summaryDate: { type: Date, default: Date.now },
+        summaryContent: mongoose.Schema.Types.Mixed, // This will store the JSON summary
+        transcription: { type: String, default: '' }
     }]
 }, { timestamps: true }); // Optionally add timestamps to automatically get createdAt and updatedAt fields
 
