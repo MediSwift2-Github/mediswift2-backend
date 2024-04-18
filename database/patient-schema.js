@@ -11,7 +11,9 @@ const patientSchema = new Schema({
     sessionSummaries: [{ // New field to store chat session summaries
         summaryDate: { type: Date, default: Date.now },
         summaryContent: mongoose.Schema.Types.Mixed, // This will store the JSON summary
-        transcription: { type: String, default: '' }
+        transcription: { type: String, default: '' },
+        healthRecord: { type: mongoose.Schema.Types.Mixed, default: {} },
+        patientHandout: { type: mongoose.Schema.Types.Mixed, default: {} }
     }]
 }, { timestamps: true }); // Optionally add timestamps to automatically get createdAt and updatedAt fields
 

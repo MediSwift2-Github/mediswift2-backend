@@ -147,12 +147,38 @@ async function transcribeAudio(audioFilePath) {
     }
 }
 
+async function convertMedicalSummaryToNotes(summary, medicalHistory) {
+    const historyContext = medicalHistory.map(entry => `${entry.visitDate}: ${JSON.stringify(entry.notes)}`).join('\n');
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo-0125",
+            messages: [
+                {
+                    role: "system",
+                    content: `Here is the existing medical history: ${historyContext}\nBased on this history, generate notes for the new visit without repeating information. Output should be in JSON format with fields for purpose of visit, chronicDiseases, acuteSymptoms, allergies, medications, previousTreatments, patientConcerns, infectiousDiseaseExposure, nutritionalStatus, familyMedicalHistory, and lifestyleFactors.`
+                },
+                {
+                    role: "user",
+                    content: summary
+                }
+            ],
+            response_format: { type: "json_object" },
+        });
+        console.log('Converted Notes:', response.choices[0].message.content);
+        return response.choices[0].message.content;
+    } catch (error) {
+        console.error('Error in convertMedicalSummaryToNotes:', error);
+        return null;
+    }
+}
+
 
 module.exports = {
     chatWithGPT,
     summarizeConversation,
     convertSummaryToJSON,
     transcribeAudio,
+    convertMedicalSummaryToNotes
 };
 
 
