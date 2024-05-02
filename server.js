@@ -20,9 +20,27 @@ const app = express();
 const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 
+// Environment-specific CORS origins
+const allowedOrigins = [
+    'http://localhost:3001',  // Local frontend
+    'https://mediswift-frontend.vercel.app'  // Vercel frontend
+];
 
-setupRealtimeUpdates(server);
-app.use(cors());
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);  // Allow CORS for this origin
+        } else {
+            callback(new Error('Not allowed by CORS'));  // Block CORS for this origin
+        }
+    },
+    credentials: true,  // Important for sessions or when using cookies
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+// Apply CORS with options
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
 
@@ -35,7 +53,7 @@ app.use(audioTranscription);
 app.use(documentationRoute);
 app.use(saveHealthRecordRouter);
 app.use(patientHandoutRoutes);
-
+setupRealtimeUpdates(server);
 
 app.get('/', (req, res) => res.send('MediSwift API Running'));
 
@@ -45,4 +63,4 @@ server.listen(port, () => {
 });
 
 // In server.js
-//require('./bot/telegramBot');
+ require('./bot/telegrambot');

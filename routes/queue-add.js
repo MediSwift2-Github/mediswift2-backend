@@ -36,6 +36,35 @@ router.post('/api/queue/add', async (req, res) => {
         res.status(400).send(error.message);
     }
 });
+
+// Endpoint to remove a patient from the queue or clear the entire queue
+router.delete('/api/queue/remove', async (req, res) => {
+    const { patientId, clearAll } = req.query;
+
+    try {
+        if (clearAll === 'true') {
+            // Clear the entire queue
+            await Queue.deleteMany({});
+            console.log('All queue entries have been removed');
+            return res.status(200).send('All queue entries have been removed.');
+        } else if (patientId) {
+            // Remove specific patient from the queue
+            const result = await Queue.findOneAndDelete({ patientId });
+            if (!result) {
+                return res.status(404).send('Patient not found in queue.');
+            }
+            console.log('Patient removed from the queue:', result);
+            return res.status(200).send('Patient removed from the queue.');
+        } else {
+            return res.status(400).send('Please provide a patientId or set clearAll to true.');
+        }
+    } catch (error) {
+        console.error('Error in removing queue entries:', error);
+        res.status(500).send('Error in removing queue entries');
+    }
+});
+
+
 // Endpoint to view the queue
 router.get('/api/queue', async (req, res) => {
     try {
