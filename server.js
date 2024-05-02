@@ -45,4 +45,4 @@ server.listen(port, () => {
 });
 
 // In server.js
-require('./bot/telegramBot');
+//require('./bot/telegramBot');
