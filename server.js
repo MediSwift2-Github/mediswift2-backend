@@ -20,26 +20,26 @@ const app = express();
 const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 
-// Environment-specific CORS origins
-const allowedOrigins = [
-    'http://localhost:3001',  // Local frontend
-    'https://mediswift-frontend.vercel.app'  // Vercel frontend
-];
 
 const corsOptions = {
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);  // Allow CORS for this origin
+        console.log("Origin attempting to access:", origin);  // Log the origin
+        const allowed = ['http://localhost:3001', 'https://mediswift-frontend.vercel.app','http://localhost:3000']
+            .some(baseURL => origin && origin.startsWith(baseURL));
+        console.log("Allowed:", allowed);  // Log if it's allowed
+
+        if (!origin || allowed) {
+            callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));  // Block CORS for this origin
+            callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true,  // Important for sessions or when using cookies
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Apply CORS with options
+// Apply CORS with these options
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
