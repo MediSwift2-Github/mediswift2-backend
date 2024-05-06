@@ -4,6 +4,7 @@ const { transcribeAudio } = require('../bot/gptChat'); // Adjust the path as nec
 const router = express.Router();
 const path = require('path');
 const {storeTranscription} = require("./storeSessionJSON");
+const fs = require('fs');
 
 // Configure Multer for audio file uploads
 const storage = multer.diskStorage({
@@ -47,6 +48,9 @@ router.post('/api/audio/upload', upload.single('audioFile'), async (req, res) =>
                 transcription: transcriptionResult.content,
                 fileDetails: req.file
             });
+            // Delete file only if transcription was successful and saved
+            // Use the deleteFile function to remove the file
+            deleteFile(req.file.path);
         } else {
             console.error('Transcription failed:', transcriptionResult.error);
             res.status(500).send({
@@ -59,5 +63,15 @@ router.post('/api/audio/upload', upload.single('audioFile'), async (req, res) =>
         res.status(500).send({ message: 'Server error during transcription.', error: error.message });
     }
 });
+
+const deleteFile = (filePath) => {
+    fs.unlink(filePath, (err) => {
+        if (err) {
+            console.error('Error deleting file:', err);
+        } else {
+            console.log(`File deleted successfully: ${filePath}`);
+        }
+    });
+};
 
 module.exports = router;
