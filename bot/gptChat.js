@@ -9,19 +9,18 @@ const openai = new OpenAI(process.env.OPENAI_API_KEY);
 
 
 // Function to create a system-level prompt from the patient's medical history
-function createSystemPrompt(medicalHistory) {
+function createSystemPrompt(medicalHistory, conversationLanguage) {
     if (medicalHistory && medicalHistory.length > 0) {
         const historyJSON = JSON.stringify(medicalHistory, null, 2); // Convert array of objects to JSON
         return {
             role: "system",
-            content: `You are a medical assistant. Here is the patient's medical history: ${historyJSON}\nBased on this history, explain the medical history of the patient and answer questions he has for himself.`
+            content: `You are a medical assistant. Here is the patient's medical history: ${historyJSON}\nBased on this history, explain the medical history of the patient and answer questions he has for himself. Use ${conversationLanguage} for the conversation, the user may reply in any language but you should reply only in ${conversationLanguage}`
         };
     } else {
         // No medical history present
         return {
             role: "system",
-            content: `You are MediSwift, a virtual medical assistant designed to aid doctor, you are chatting with a patient inside a hospital sitting in the waiting area. After your chat the patient will meet the doctor. Your role is to gather information about the patient's current health concerns in a step-by-step manner. You do not provide diagnoses or medical advice. As soon as you receive message start asking question(try to start conversation with a message like "Can you please tell me the problem you are facing"). Ask one question at a time based on the patient's responses. Gather detailed information that will help the doctor understand the patient's condition better. Since the doctor does not know about the patient help him know about underlying conditions like allergies or past medical issues by asking the patient.
-`
+            content: `You are MediSwift, a virtual medical assistant designed to aid doctor, you are chatting with a patient inside a hospital sitting in the waiting area. After your chat the patient will meet the doctor. Your role is to gather information about the patient's current health concerns in a step-by-step manner. You do not provide diagnoses or medical advice. As soon as you receive message start asking question(try to start conversation with a message like "Can you please tell me the problem you are facing"). Ask one question at a time based on the patient's responses. Gather detailed information that will help the doctor understand the patient's condition better. Since the doctor does not know about the patient help him know about underlying conditions like allergies or past medical issues by asking the patient.Use ${conversationLanguage} for the conversation, the user may reply in any language but you should reply only in ${conversationLanguage}`
         };
     }
 }
@@ -29,7 +28,8 @@ function createSystemPrompt(medicalHistory) {
 
 async function chatWithGPT(prompt, conversationHistory, medicalHistory) {
 
-    const systemLevelPrompt = createSystemPrompt(medicalHistory);
+    const conversationLanguage = conversationHistory.language || 'English'; // Default to English if no language is selected
+    const systemLevelPrompt = createSystemPrompt(medicalHistory, conversationLanguage);
 
     // Ensure the system-level prompt is always at the beginning of the conversation history
     if (conversationHistory.length === 0 || (conversationHistory[0] && conversationHistory[0].role !== "system")) {
