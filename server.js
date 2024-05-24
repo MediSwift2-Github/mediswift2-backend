@@ -42,7 +42,8 @@ const corsOptions = {
 };
 
 // Apply CORS with these options
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions));
+app.use(cors());
 app.use(bodyParser.json());
 
 
