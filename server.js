@@ -37,12 +37,12 @@ const corsOptions = {
         }
     },
     credentials: true,
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 // Apply CORS with these options
-app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
 
