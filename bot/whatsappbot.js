@@ -111,7 +111,7 @@ router.post('/send-message', async (req, res) => {
 // Webhook challenge response endpoint
 router.get('/webhook', (req, res) => {
     try {
-        const challenge = req.query['challenge'];
+        const challenge = req.query['challange'];
         if (challenge) {
             res.status(200).send(challenge);
         } else {
