@@ -3,14 +3,16 @@ const router = express.Router();
 const Patient = require('../database/patient-schema');
 const fetch = require('node-fetch');
 const Queue = require('../database/queue-schema');
+const axios = require('axios');
+const baseUrl = process.env.NODE_ENV === 'production' ? process.env.BASE_URL : `http://localhost:${process.env.PORT || 3000}`;
 
 
 const TELEGRAM_API = 'https://api.telegram.org/bot';
 const TOKEN = '6966801360:AAF7d2ec-Fq5yWKO9bgwn9N-CtgdbvhIAsk';
 
+const localApiUrl = `http://localhost:${process.env.PORT || 3000}/send-message`;
 
 
-// Endpoint to save the patient handout
 router.post('/api/savePatientHandout', async (req, res) => {
     const { patientId, patientHandout, summaryDate } = req.body;
 
@@ -22,7 +24,7 @@ router.post('/api/savePatientHandout', async (req, res) => {
         const patientData = await storePatientHandout(patientId, patientHandout, summaryDate);
         if (patientData) {
             const chatId = patientData.mobile_number;  // Extract the mobile number
-            await sendTelegramMessage(chatId, `Here is your patient handout:\n${patientHandout}`);
+            await sendWhatsAppMessage(chatId, `Here is your patient handout:\n${patientHandout}`);
 
             // Attempt to update the queue status to 'Completed'
             updateQueueStatus(patientId, 'Completed').catch(error => {
@@ -38,6 +40,7 @@ router.post('/api/savePatientHandout', async (req, res) => {
         res.status(500).send('Failed to store or send patient handout.');
     }
 });
+
 
 
 
@@ -74,31 +77,28 @@ async function storePatientHandout(patientId, patientHandout, summaryDate) {
 
 
 
-async function sendTelegramMessage(chatId, text) {
-    const url = `${TELEGRAM_API}${TOKEN}/sendMessage`;
+async function sendWhatsAppMessage(to, text) {
+    // Sanitize text to replace unsupported HTML tags with plain text or WhatsApp-supported formatting
+    const sanitizedText = text.replace(/<p>/gi, '\n').replace(/<\/p>/gi, '')
+        .replace(/<strong>/gi, '*').replace(/<\/strong>/gi, '*');
 
-    // Replace unsupported HTML tags with Telegram-supported or plain text
-    const sanitizedText = text.replace(/<p>/gi, '').replace(/<\/p>/gi, '\n')
-        .replace(/<strong>/gi, '<b>').replace(/<\/strong>/gi, '</b>');
-
-    const body = {
-        chat_id: chatId,
-        text: sanitizedText,
-        parse_mode: 'HTML'
+    const data = {
+        to: to,
+        body: sanitizedText
     };
 
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+        const response = await axios.post(`${baseUrl}/send-message`, data, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
-        const responseData = await response.json();
-        console.log('Message sent successfully:', responseData);
+        console.log('Message sent successfully:', response.data);
     } catch (error) {
-        console.error('Failed to send message:', error);
+        console.error('Failed to send message:', error.response ? error.response.data : error.message);
     }
 }
+
 
 async function updateQueueStatus(patientId, newStatus) {
     try {
