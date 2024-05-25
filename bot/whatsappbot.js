@@ -228,7 +228,7 @@ router.post('/webhook', async (req, res) => {
 
         if (success) {
             const replyResponse = await sendReply(from, content, messageId);
-            console.log('Reply sent:', replyResponse);
+            // console.log('Reply sent:', replyResponse);
         } else {
             console.error('Error in chatWithGPT:', error);
             res.status(500).send({ error: 'Failed to process incoming message.' });
