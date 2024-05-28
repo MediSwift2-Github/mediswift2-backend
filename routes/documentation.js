@@ -46,11 +46,11 @@ router.get('/getSummary', async (req, res) => {
 });
 
 async function createEHRentry(summaryContent, transcription) {
-    return await createOpenAIResponse("You are a helpful assistant designed to output JSON. Given a summary of the purpose of visit and a transcription of the conversation between doctor and patient, output a structured JSON object that makes sense for an electronic health record (EHR) entry.", summaryContent, transcription);
+    return await createOpenAIResponse("You are a technical assistant proficient in medical jargon, designed to output JSON. Given a summary of the purpose of visit received through a text conversation before the consultation and a transcription of the conversation between doctor and patient, output a structured JSON object suitable for an electronic health record (EHR) entry. Ensure the output is comprehensive and understandable for a doctor. Output only the JSON object.", summaryContent, transcription);
 }
 
 async function createHandout(summaryContent, transcription) {
-    return await createOpenAIResponse("Create a handout for the patient based on his problems. This handout should be a JSON that contains Do's, Dont's and Dietary restrictions.", summaryContent, transcription);
+    return await createOpenAIResponse("Create a patient-friendly handout based on the patient's problems. The handout should be a JSON in simple and subtle language, suitable for WhatsApp, and should avoid medical jargon. It should include Do's, Don'ts, and Dietary restrictions, but if there are better suggestions, include those too. The handout should be concise, readable within 1 minute. Output only the JSON object.", summaryContent, transcription);
 }
 
 async function createOpenAIResponse(systemInstruction, summaryContent, transcription) {
@@ -61,7 +61,7 @@ async function createOpenAIResponse(systemInstruction, summaryContent, transcrip
 
     const userPrompt = {
         role: "user",
-        content: `${summaryContent}  and  ${transcription}`
+        content: `Summary: """${summaryContent}"""  Transcription: """${transcription}"""`
     };
 
     try {
