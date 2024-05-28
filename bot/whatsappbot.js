@@ -291,7 +291,7 @@ async function endSessionActions(chatId, messageId) {
 
     // Retrieve the conversation history for summarization
     let conversationHistoryForSummary = conversationHistory[chatId].map(message => ({
-        role: message.sender === 'user' ? 'user' : 'assistant',
+        role: message.role,  // Use existing role property
         content: message.content
     }));
 
