@@ -8,7 +8,7 @@ const { chatWithGPT, summarizeConversation, convertSummaryToJSON } = require('./
 const { storeSessionSummary } = require("../routes/storeSessionJSON");  // Import the storeSessionSummary function
 const Queue = require('../database/queue-schema');  // Import the Queue schema
 const Patient = require('../database/patient-schema');  // Import the Patient schema
-
+const userLanguages = require('../database/languageStore');
 // Ensure to initialize conversationHistory
 const conversationHistory = {};
 const medicalHistory = {};
@@ -137,6 +137,9 @@ function parseWebhookRequest(req) {
         language = text; // Assuming the button text represents the language
     } else if (message && message.text) {
         text = message.text.body;
+    }
+    if (from && language) {
+        userLanguages[from] = language;  // Store the language choice
     }
 
     return { from, text, language, messageId, message };

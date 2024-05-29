@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Patient = require('../database/patient-schema');
 const { OpenAI } = require("openai");
+const userLanguages = require('../database/languageStore');
 
 const openai = new OpenAI(process.env.OPENAI_API_KEY);
 
@@ -28,7 +29,7 @@ router.get('/getSummary', async (req, res) => {
         }
 
         const ehrResponse = await createEHRentry(summary.summaryContent, summary.transcription);
-        const handoutResponse = await createHandout(summary.summaryContent, summary.transcription);
+        const handoutResponse = await createHandout(summary.summaryContent, summary.transcription, patient.mobile_number);
         console.log('Data type of EHR content:', typeof ehrResponse.content);
         console.log('Data type of Handout content:', typeof handoutResponse.content);
         if (ehrResponse.success && handoutResponse.success) {
@@ -49,8 +50,20 @@ async function createEHRentry(summaryContent, transcription) {
     return await createOpenAIResponse("You are a technical assistant proficient in medical jargon, designed to output JSON. Given a summary of the purpose of visit received through a text conversation before the consultation and a transcription of the conversation between doctor and patient, output a structured JSON object suitable for an electronic health record (EHR) entry. Ensure the output is comprehensive and understandable for a doctor. Output only the JSON object.", summaryContent, transcription);
 }
 
-async function createHandout(summaryContent, transcription) {
-    return await createOpenAIResponse("Create a patient-friendly handout based on the patient's problems. The handout should be a JSON in simple and subtle language, suitable for WhatsApp, and should avoid medical jargon. It should include Do's, Don'ts, and Dietary restrictions, but if there are better suggestions, include those too. The handout should be concise, readable within 1 minute. Output only the JSON object.", summaryContent, transcription);
+async function createHandout(summaryContent, transcription, userId) {
+    const language = userLanguages[userId];
+    let systemInstruction;
+
+    if (language && language.toLowerCase() !== 'english') {
+        systemInstruction = `Create a patient-friendly handout based on the patient's problems. The handout should be in JSON format, written in simple and subtle language suitable for WhatsApp, and should avoid medical jargon. Include sections for Do's, Don'ts, and Dietary restrictions. If there are better suggestions, include those too. The handout should be concise and readable in 2-3 minutes. Additionally, provide the handout in both English and the language specified in the UserLanguages variable. Here is an example format for English and ${language}:
+{
+    "English": "Please rest and eat your food on time.",
+    "${language}": "Translation in ${language}"
+}`;
+    } else {
+        systemInstruction = "Create a patient-friendly handout based on the patient's problems. The handout should be a JSON in simple and subtle language, suitable for WhatsApp, and should avoid medical jargon. It should include Do's, Don'ts, and Dietary restrictions, but if there are better suggestions, include those too. The handout should be concise, readable within 1 minute. Output only the JSON object.";
+    }
+    return await createOpenAIResponse(systemInstruction, summaryContent, transcription);
 }
 
 async function createOpenAIResponse(systemInstruction, summaryContent, transcription) {
