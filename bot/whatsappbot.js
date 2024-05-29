@@ -15,6 +15,7 @@ const medicalHistory = {};
 const sessionStartTimes = {}; // Add this line
 const lastMessageIds = {};  // Add this line
 const baseUrl = process.env.NODE_ENV === 'production' ? process.env.BASE_URL : `http://localhost:${process.env.PORT || 3000}`;
+const sessionStates = {}; // Add this line to track session states
 
 const SESSION_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
@@ -201,6 +202,12 @@ router.post('/webhook', async (req, res) => {
         console.log('From:', from);
         console.log('Message ID:', messageId);
 
+        // Check if the session has already ended
+        if (sessionStates[from] === 'ended') {
+            console.log('Ignoring message as session has already ended for:', from);
+            return res.status(200).send({ success: true, message: 'Session has already ended. Ignoring message.' });
+        }
+
         initializeHistory(from, language);
 
         if (!sessionStartTimes[from]) {
@@ -289,6 +296,9 @@ async function endSessionActions(chatId, messageId) {
     console.log(`Session for ${chatId} has ended.`);
     console.log(`Complete conversation for chat ID ${chatId}:`, JSON.stringify(conversationHistory[chatId], null, 2));
 
+    // Mark the session as ended
+    sessionStates[chatId] = 'ended';
+
     // Retrieve the conversation history for summarization
     let conversationHistoryForSummary = conversationHistory[chatId].map(message => ({
         role: message.role,  // Use existing role property
@@ -321,6 +331,11 @@ async function endSessionActions(chatId, messageId) {
     delete sessionStartTimes[chatId];
     delete conversationHistory[chatId];
     delete lastMessageIds[chatId];  // Clean up the last message ID
+
+    setTimeout(() => {
+        delete sessionStates[chatId];
+        console.log(`Session state for ${chatId} has been cleared after one hour.`);
+    }, 60 * 60 * 1000);  // 1 hour in milliseconds
 }
 
 
