@@ -329,7 +329,7 @@ async function endSessionActions(chatId, messageId) {
     }
 
     // Notify the user that their session has ended
-    await sendReply(chatId, "Your session has ended. Thank you for chatting with us!", messageId);
+    await sendReply(chatId, "Thank you. I have recorded all your information and forwarded it to the doctor. The doctor will attend to you shortly.\n\n\"धन्यवाद। मैंने आपकी सभी जानकारी दर्ज कर ली है और उसे डॉक्टर को भेज दिया है। डॉक्टर कुछ ही मिनटों में आपसे मिलेंगे।\"", messageId);
     // Clean up session data
     delete sessionStartTimes[chatId];
     delete conversationHistory[chatId];
