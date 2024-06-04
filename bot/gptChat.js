@@ -152,14 +152,19 @@ async function transcribeAudio(audioFilePath) {
 }
 
 async function convertMedicalSummaryToNotes(summary, medicalHistory) {
-    const historyContext = medicalHistory.map(entry => `${entry.visitDate}: ${JSON.stringify(entry.notes)}`).join('\n');
+    // Check if medicalHistory is empty or not provided and adjust the historyContext message accordingly
+    const historyContext = medicalHistory && medicalHistory.length > 0
+        ? medicalHistory.map(entry => `${entry.visitDate}: ${JSON.stringify(entry.notes)}`).join('\n')
+        : "No prior medical history available.";
+
     try {
+        // Make a request to the API with handling for empty or nonexistent medical history
         const response = await openai.chat.completions.create({
             model: "gpt-3.5-turbo-0125",
             messages: [
                 {
                     role: "system",
-                    content: "You are a technical medical assistant. Here is the existing medical history: ${historyContext}. Understand this history thoroughly, noting existing details such as allergies, family medical history, and other relevant information. Avoid repeating information already present in the medical history."
+                    content: `You are a technical medical assistant. Here is the existing medical history: ${historyContext}. Understand this history thoroughly, noting existing details such as allergies, family medical history, and other relevant information. Avoid repeating information already present in the medical history.`
                 },
                 {
                     role: "system",
@@ -167,7 +172,7 @@ async function convertMedicalSummaryToNotes(summary, medicalHistory) {
                 },
                 {
                     role: "user",
-                    content: "${summary}"
+                    content: summary
                 }
             ],
             response_format: { type: "json_object" },

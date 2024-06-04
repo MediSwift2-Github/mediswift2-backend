@@ -162,7 +162,22 @@ function initializeHistory(from, language = null) {
 
 
 async function handleGPTResponse(from, text) {
-    const { success, content, conversationHistory: updatedHistory } = await chatWithGPT(text, conversationHistory[from], medicalHistory[from]);
+    // Assuming 'from' can be used to fetch the corresponding queue record
+    let queueRecord = await Queue.findOne({ patientMobileNumber: from }).populate('patientId').exec();
+    if (!queueRecord) {
+        return { success: false, error: 'No queue record found for this number.' };
+    }
+
+    // Accessing the patient's medical history
+    let patient = queueRecord.patientId;
+    if (!patient) {
+        return { success: false, error: 'Patient record not found.' };
+    }
+
+    const medicalHistory = patient.medical_history;
+
+    // Now you have access to medicalHistory, proceed with handling the GPT response
+    const { success, content, conversationHistory: updatedHistory } = await chatWithGPT(text, conversationHistory[from], medicalHistory);
 
     if (success) {
         conversationHistory[from] = updatedHistory;
