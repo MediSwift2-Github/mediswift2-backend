@@ -26,7 +26,7 @@ const server = http.createServer(app);
 const corsOptions = {
     origin: function (origin, callback) {
         console.log("Origin attempting to access:", origin);  // Log the origin
-        const allowed = ['http://localhost:3001', 'https://mediswift-frontend.vercel.app','http://localhost:3000','http://localhost:3002']
+        const allowed = ['http://localhost:3001', 'https://mediswift2-frontend.vercel.app/','http://localhost:3000','http://localhost:3002']
             .some(baseURL => origin && origin.startsWith(baseURL));
         console.log("Allowed:", allowed);  // Log if it's allowed
 
