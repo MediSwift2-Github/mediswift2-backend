@@ -22,7 +22,8 @@ const upload = multer({ storage: storage });
 
 router.post('/api/audio/upload', upload.single('audioFile'), async (req, res) => {
     console.log('Received audio upload request', req.file ? `for file: ${req.file.filename}` : 'without file');
-    console.log('Request body:', req.body); // Add this line to log the request body
+    console.log('Request body:', req.body); // Log the request body for debugging
+
     if (!req.file) {
         console.log('No file uploaded');
         return res.status(400).send('No file uploaded.');
@@ -34,22 +35,20 @@ router.post('/api/audio/upload', upload.single('audioFile'), async (req, res) =>
         console.log('Sending file for transcription:', req.file.path);
 
         const transcriptionResult = await transcribeAudio(req.file.path);
-
         if (transcriptionResult.success) {
             const patientId = req.body.patientId; // Extracted from FormData
-            // Assuming summaryDate is also passed from the frontend
             const summaryDate = req.body.summaryDate ? new Date(req.body.summaryDate) : new Date();
 
-            // Store the transcription in the patient's document
             await storeTranscription(patientId, transcriptionResult.content, summaryDate);
 
+            // Send response with successful transcription data
             res.send({
                 message: 'Audio file uploaded, transcribed, and transcription saved successfully.',
                 transcription: transcriptionResult.content,
                 fileDetails: req.file
             });
+
             // Delete file only if transcription was successful and saved
-            // Use the deleteFile function to remove the file
             deleteFile(req.file.path);
         } else {
             console.error('Transcription failed:', transcriptionResult.error);
