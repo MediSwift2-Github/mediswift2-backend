@@ -232,8 +232,9 @@ router.post('/webhook', async (req, res) => {
             // Check if the mobile number is in queue and handle accordingly
             const isInQueue = await isMobileNumberInQueue(from);
             if (!isInQueue) {
-                await sendReply(from, "Sorry, your number is not in the queue.", messageId);
-                return;
+                // If not in queue, just return success without doing anything
+                console.log(`Number ${from} is not in queue. Ignoring message.`);
+                return res.status(200).send({ success: true, message: 'Number not in queue. Ignoring message.' });
             }
 
             // Initialize session start time
