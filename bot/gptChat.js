@@ -30,9 +30,8 @@ function createSystemPrompt(medicalHistory, conversationLanguage) {
 }
 
 
-async function chatWithGPT(prompt, conversationHistory, medicalHistory) {
-
-    const conversationLanguage = conversationHistory.language || 'English'; // Default to English if no language is selected
+async function chatWithGPT(prompt, conversationHistory, medicalHistory, language) {
+    const conversationLanguage = language || conversationHistory.language || 'English'; // Default to English if no language is selected
     const systemLevelPrompt = createSystemPrompt(medicalHistory, conversationLanguage);
 
     // Ensure the system-level prompt is always at the beginning of the conversation history
@@ -44,7 +43,7 @@ async function chatWithGPT(prompt, conversationHistory, medicalHistory) {
 
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: "gpt-4o-mini",
             messages: conversationHistory,
         });
 
@@ -65,14 +64,14 @@ async function summarizeConversation(conversationHistory) {
     const summaryPrompt = {
         role: "system",
         content: "You are part of a virtual medical assistant designed to aid doctors. A chatbot was deployed to talk to the patient to gather detailed information about their concerns, symptoms, medical history, etc., to help the doctor understand the purpose of the visit while providing all the details retrieved during the chat. Your job is to understand the conversation and make detailed clinical notes that include all relevant medical details without adding any noise or unwanted details. The notes should be structured and include sections for chronic diseases, acute diseases, allergies, and other relevant medical history based on the conversation. Follow these steps: 1. Extract and list all relevant information from the conversation in a structured manner. 2. Create a comprehensive medical history based on the extracted information. 3. Compile detailed clinical notes, ensuring they are accurate and technically sound, suitable for a doctor's review. Ensure the total length of the clinical notes can be read within 1-2 minutes. This is the conversation:"
-};
+    };
 
     // Add the summary prompt at the beginning of the conversation history
     filteredHistory.unshift(summaryPrompt);
 
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: "gpt-4o-mini",
             messages: filteredHistory, // Use the filtered and updated history here
         });
 
@@ -89,7 +88,7 @@ async function summarizeConversation(conversationHistory) {
 
 async function convertSummaryToJSON(summary) {
     const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo-0125",
+        model: "gpt-4o-mini",
         messages: [
             {
                 role: "system",
@@ -159,7 +158,7 @@ async function convertMedicalSummaryToNotes(summary, medicalHistory) {
     try {
         // Make a request to the API with handling for empty or nonexistent medical history
         const response = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo-0125",
+            model: "gpt-4o-mini",
             messages: [
                 {
                     role: "system",

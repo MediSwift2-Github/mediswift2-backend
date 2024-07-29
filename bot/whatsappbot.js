@@ -16,8 +16,18 @@ const sessionStartTimes = {}; // Add this line
 const lastMessageIds = {};  // Add this line
 const baseUrl = process.env.NODE_ENV === 'production' ? process.env.BASE_URL : `http://localhost:${process.env.PORT || 3000}`;
 const sessionStates = {}; // Add this line to track session states
+const fs = require('fs');
+const path = require('path');
+const { transcribeAudio } = require('../bot/gptChat'); // Adjust the path as necessary
 
 const SESSION_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const SHORT_MESSAGE_THRESHOLD = 20; // Define what constitutes a short message (in characters)
+const INACTIVITY_TIMEOUT = 5000; // 3 seconds
+const MONITORING_PHASE_DURATION = 120000; // 2 minutes in milliseconds
+
+const messageBuffers = {}; // Temporary storage for messages
+const inactivityTimers = {}; // Timers for inactivity detection
+const userBehavior = {}; // To track user behavior
 
 
 const isMobileNumberInQueue = async (mobileNumber) => {
@@ -131,19 +141,23 @@ function parseWebhookRequest(req) {
     const messageId = message ? message.id : null;
     let text = null;
     let language = null;
+    let audio = null;  // Add this line
 
     if (message && message.type === 'button') {
         text = message.button.text;
-        language = text; // Assuming the button text represents the language
+        language = text;
     } else if (message && message.text) {
         text = message.text.body;
+    } else if (message && message.type === 'audio') {  // Add this block
+        audio = message.audio;
     }
     if (from && language) {
-        userLanguages[from] = language;  // Store the language choice
+        userLanguages[from] = language;
     }
 
-    return { from, text, language, messageId, message };
+    return { from, text, language, messageId, message, audio };  // Add audio here
 }
+
 
 
 function initializeHistory(from, language = null) {
@@ -157,18 +171,18 @@ function initializeHistory(from, language = null) {
 
     if (language) {
         conversationHistory[from].language = language;
+        console.log(`Initialized conversation history for ${from} with language: ${language}`);
     }
 }
 
 
+
 async function handleGPTResponse(from, text) {
-    // Assuming 'from' can be used to fetch the corresponding queue record
     let queueRecord = await Queue.findOne({ patientMobileNumber: from }).populate('patientId').exec();
     if (!queueRecord) {
         return { success: false, error: 'No queue record found for this number.' };
     }
 
-    // Accessing the patient's medical history
     let patient = queueRecord.patientId;
     if (!patient) {
         return { success: false, error: 'Patient record not found.' };
@@ -176,7 +190,6 @@ async function handleGPTResponse(from, text) {
 
     const medicalHistory = patient.medical_history;
 
-    // Now you have access to medicalHistory, proceed with handling the GPT response
     const { success, content, conversationHistory: updatedHistory } = await chatWithGPT(text, conversationHistory[from], medicalHistory);
 
     if (success) {
@@ -186,6 +199,8 @@ async function handleGPTResponse(from, text) {
         return { success: false, error: content };
     }
 }
+
+
 
 async function sendReply(to, body, messageId) {
     const data = {
@@ -206,68 +221,160 @@ async function sendReply(to, body, messageId) {
 }
 
 router.post('/webhook', async (req, res) => {
-    console.log('Received webhook:', req.body);
+    console.log('Received webhook:', JSON.stringify(req.body, null, 2));
 
     try {
-        const { from, text, language, messageId, message } = parseWebhookRequest(req);
+        const { from, text, language, messageId, message, audio } = parseWebhookRequest(req);
 
-        if (!from || !text) {
+        if (!from) {
             console.error('Invalid message structure:', message);
             return res.status(400).send({ error: 'Invalid message structure.' });
         }
 
-        console.log('Incoming message text:', text);
-        console.log('From:', from);
-        console.log('Message ID:', messageId);
+        if (!text && !audio) {
+            console.error('No text or audio message found:', message);
+            return res.status(400).send({ error: 'No text or audio message found.' });
+        }
 
-        // Check if the session has already ended
         if (sessionStates[from] === 'ended') {
             console.log('Ignoring message as session has already ended for:', from);
             return res.status(200).send({ success: true, message: 'Session has already ended. Ignoring message.' });
         }
 
-        initializeHistory(from, language);
+        // Check if the user has an existing language preference
+        const existingLanguage = conversationHistory[from] ? conversationHistory[from].language : null;
+
+        if (language && existingLanguage && language !== existingLanguage) {
+            // New language selected, reset the conversation
+            console.log(`User ${from} switched to a new language: ${language}. Resetting the conversation.`);
+
+            // Clear session data
+            delete sessionStartTimes[from];
+            delete conversationHistory[from];
+            delete lastMessageIds[from];
+            delete messageBuffers[from];
+            clearTimeout(inactivityTimers[from]);
+            delete inactivityTimers[from];
+            delete userBehavior[from];
+            delete sessionStates[from];
+
+            // Initialize history with the new language
+            initializeHistory(from, language);
+        }
+
+        if (language) {
+            console.log(`User ${from} switched to language: ${language}`);
+            initializeHistory(from, language); // Ensure history is initialized with the new language
+        }
 
         if (!sessionStartTimes[from]) {
-            // Check if the mobile number is in queue and handle accordingly
             const isInQueue = await isMobileNumberInQueue(from);
             if (!isInQueue) {
-                // If not in queue, just return success without doing anything
                 console.log(`Number ${from} is not in queue. Ignoring message.`);
                 return res.status(200).send({ success: true, message: 'Number not in queue. Ignoring message.' });
             }
 
-            // Initialize session start time
             sessionStartTimes[from] = new Date();
-            lastMessageIds[from] = messageId;  // Store the messageId
+            lastMessageIds[from] = messageId;
 
-            // Start session timeout
             setTimeout(() => {
-                endSessionActions(from, lastMessageIds[from]);  // Pass the messageId to the endSessionActions function
+                endSessionActions(from, lastMessageIds[from]);
             }, SESSION_DURATION);
         } else {
-            // Update the last message ID
             lastMessageIds[from] = messageId;
         }
 
-        const { success, content, error } = await handleGPTResponse(from, text);
-
-        if (success) {
-            const replyResponse = await sendReply(from, content, messageId);
-            // console.log('Reply sent:', replyResponse);
-        } else {
-            console.error('Error in chatWithGPT:', error);
-            res.status(500).send({ error: 'Failed to process incoming message.' });
-            return;
+        if (!userBehavior[from]) {
+            userBehavior[from] = {
+                shortMessageCount: 0,
+                longMessageCount: 0,
+                isMonitoring: true,
+                aggregationEnabled: true,
+                startTime: Date.now()
+            };
         }
-    } catch (error) {
-        console.error('Error processing incoming message:', error.response ? error.response.data : error.message);
-        res.status(500).send({ error: 'Failed to process incoming message.' });
-        return;
-    }
 
-    res.status(200).send({ success: true });
+        const user = userBehavior[from];
+
+        if (user.isMonitoring) {
+            if (text && text.length < SHORT_MESSAGE_THRESHOLD) {
+                user.shortMessageCount++;
+            } else {
+                user.longMessageCount++;
+            }
+
+            if (Date.now() - user.startTime > MONITORING_PHASE_DURATION) {
+                user.isMonitoring = false;
+                if (user.longMessageCount > user.shortMessageCount) {
+                    user.aggregationEnabled = false;
+                }
+            }
+        }
+
+        let userMessage = text;
+
+        if (audio) {
+            const mediaIdEndpoint = `https://crmapi.com.bot/api/meta/v19.0/${audio.id}`;
+            const mediaResponse = await axios({
+                method: 'get',
+                url: mediaIdEndpoint,
+                headers: { 'Authorization': `Bearer ${process.env.BEARER_TOKEN}` },
+                responseType: 'arraybuffer'
+            });
+
+            const audioDir = path.join(__dirname, 'audio');
+            if (!fs.existsSync(audioDir)) {
+                fs.mkdirSync(audioDir);
+            }
+            const audioFilePath = path.join(audioDir, `${audio.id}.ogg`);
+            fs.writeFileSync(audioFilePath, mediaResponse.data);
+
+            const transcriptionResult = await transcribeAudio(audioFilePath);
+            if (!transcriptionResult.success) {
+                console.error('Transcription failed:', transcriptionResult.error);
+                fs.unlinkSync(audioFilePath); // Cleanup audio file immediately
+                return res.status(500).send({ error: 'Failed to transcribe audio message.' });
+            }
+
+            userMessage = transcriptionResult.content; // Use transcription as the user message
+            fs.unlinkSync(audioFilePath); // Cleanup audio file immediately
+        }
+
+        if (user.aggregationEnabled) {
+            if (!messageBuffers[from]) {
+                messageBuffers[from] = [];
+            }
+
+            messageBuffers[from].push(userMessage);
+
+            if (userMessage.length < SHORT_MESSAGE_THRESHOLD) {
+                if (inactivityTimers[from]) {
+                    clearTimeout(inactivityTimers[from]);
+                }
+
+                inactivityTimers[from] = setTimeout(() => {
+                    processAggregatedMessages(from);
+                }, INACTIVITY_TIMEOUT);
+            } else {
+                if (inactivityTimers[from]) {
+                    clearTimeout(inactivityTimers[from]);
+                }
+                processAggregatedMessages(from);
+            }
+        } else {
+            processAndRespond(from, userMessage);
+        }
+
+        return res.status(200).send({ success: true });
+
+    } catch (error) {
+        console.error('Error processing incoming message:', error);
+        return res.status(500).send({ error: 'Internal Server Error', details: error.message });
+    }
 });
+
+
+
 
 
 
@@ -349,13 +456,46 @@ async function endSessionActions(chatId, messageId) {
     // Clean up session data
     delete sessionStartTimes[chatId];
     delete conversationHistory[chatId];
-    delete lastMessageIds[chatId];  // Clean up the last message ID
+    delete lastMessageIds[chatId];
+    delete messageBuffers[chatId];
+    clearTimeout(inactivityTimers[chatId]);
+    delete inactivityTimers[chatId];
+    delete userBehavior[chatId];
+    delete sessionStates[chatId];
 
     setTimeout(() => {
         delete sessionStates[chatId];
         console.log(`Session state for ${chatId} has been cleared after one hour.`);
     }, 60 * 60 * 1000);  // 1 hour in milliseconds
 }
+
+const processAggregatedMessages = async (from) => {
+    if (!messageBuffers[from] || messageBuffers[from].length === 0) {
+        return;
+    }
+
+    const aggregatedMessage = messageBuffers[from].join(' ');
+    messageBuffers[from] = []; // Clear buffer after processing
+    delete inactivityTimers[from];
+
+    await processAndRespond(from, aggregatedMessage);
+};
+
+const processAndRespond = async (from, message) => {
+    console.log(`Processing message for ${from}: ${message}`);
+
+    const language = conversationHistory[from].language || 'English';
+    const { success, content, error } = await chatWithGPT(message, conversationHistory[from], medicalHistory[from], language);
+
+    if (success) {
+        console.log(`Sending reply to ${from} in language: ${language}`);
+        await sendReply(from, content, lastMessageIds[from]);
+    } else {
+        console.error('Error in chatWithGPT:', error);
+    }
+};
+
+
 
 
 module.exports = router;
